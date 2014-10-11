@@ -1,6 +1,8 @@
 """
 Supervised Decision List Classifier for Word Sense Disambiguation.
 
+Using Sklearns Base classifier as a guide for building the API
+
 TODO:
     ---
     Procedure:
