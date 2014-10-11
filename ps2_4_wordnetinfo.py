@@ -5,7 +5,6 @@ resolution step.
 TODO:
     Testing
     Are the two terms Hypo/Hypernyms
-    Similarity with two metrics
 """
 
 import sys
@@ -26,6 +25,26 @@ def synsets_of(word):
 
 def pos_of(synset):
     return set(sense.pos for sense in synset)
+
+def wu_p_sim(result1, result2):
+    """
+    Input: Two results dicts
+    Returns: Similarity of the most common senses of two types
+    ---
+    A thesaurus similarity algorithm based on the depth in the taxonomy and the
+    most specific ancestor node that is common to both of them.
+    """
+    return result1["synsets"][0].wup_similarity(result2["synsets"][0])
+
+def l_ch_sim(result1, result2):
+    """
+    Input: Two results dicts
+    Returns: Similarity of the most common senses of two types
+    ---
+    A thesaurus similarity algorithm based on the shortest connecting path and
+    how deep in the taxonomy they are.
+    """
+    return result1["synsets"][0].lch_similarity(result2["synsets"][0])
 
 def compute_overlap(signature, context):
     """
@@ -68,24 +87,22 @@ def simple_lesk(results, context):
 
 def print_results(results):
     print("{:<20}{:>}"
-        .format("Word", results["word"]))
+            .format("Word:", results["word"]))
 
     print("{:<20}{:>}"
-        .format("Base Form", results["base"]))
+            .format("Base Form:", results["base"]))
 
     # hacky way to print an awkward list neatly
     print("{:<20}{:>}"
-        .format("Synsets", results["synsets"][0]))
+            .format("Synsets:", results["synsets"][0]))
     for syn in results["synsets"][1:]:
         print("{:<20}{:>}".format("", syn))
 
     print("{:<20}{:>}"
-        .format("Possible POS tags", ", ".join(results["pos_tags"])))
+            .format("Possible POS tags:", ", ".join(results["pos_tags"])))
 
     print("{:<20}{:>}"
-        .format("Best sense via Lesk", results["best_sense"]))
-
-    print("\n")
+            .format("Best sense via Lesk:", results["best_sense"]))
 
 def get_results(word_list, word_context):
     list_results = []
@@ -98,6 +115,7 @@ def get_results(word_list, word_context):
         res["best_sense"] = simple_lesk(res, word_context[i])
         print_results(res)
         list_results.append(res)
+    print("\n")
 
     return list_results
 
@@ -112,6 +130,14 @@ def main(args):
     contexts.append(args.context2 if args.context2 else raw_input("Enter a context for " + words[1] + " >> "))
 
     results = get_results(words, contexts)
+
+    print("{:<20}{:>}"
+            .format("Leacock-Chodorow Similarity: ",
+               l_ch_sim(results[0], results[1])))
+
+    print("{:<20}{:>}"
+            .format("Wu-Palmer Similarity: ",
+               wu_p_sim(results[0], results[1])))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
