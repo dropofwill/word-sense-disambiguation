@@ -77,7 +77,10 @@ def simple_lesk(results, context):
         signature = set(w.lower() for w in tokenizer.tokenize(" ".join(text)) \
                             if w.lower() not in stop_words)
 
+        print signature
+
         overlap = compute_overlap(signature, context)
+        print overlap
 
         if overlap > max_overlap:
             max_overlap = overlap
@@ -102,7 +105,7 @@ def print_results(results):
             .format("Possible POS tags:", ", ".join(results["pos_tags"])))
 
     print("{:<20}{:>}"
-            .format("Best sense via Lesk:", results["best_sense"]))
+            .format("Best sense via Lesk: ", results["best_sense"]))
 
 def get_results(word_list, word_context):
     list_results = []

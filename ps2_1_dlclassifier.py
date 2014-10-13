@@ -46,9 +46,85 @@ TODO:
 
 import sys
 import argparse
+import pprint
+import string
+import re
+from nltk.probability import ConditionalFreqDist
+from nltk.probability import ConditionalProbDist
+from nltk.probability import LaplaceProbDist
+from nltk.probability import LidstoneProbDist
+from nltk.probability import UniformProbDist
+from nltk.corpus import stopwords
+from nltk.tokenize.punkt import PunktWordTokenizer
+from nltk.tokenize import RegexpTokenizer
+tokenizer = PunktWordTokenizer()
+#tokenizer = RegexpTokenizer(r'\w+|\$[\d\.]+|\S+')
+#tokenizer = RegexpTokenizer(r'\S+')
+
+pp = pprint.PrettyPrinter(indent=4)
+
+test_data = \
+"""
+bass:	Stephan Weidner, the composer and bass player for Boehse Onkelz, a
+bass:	valued at $250,000. Another double bass trapped in the room is
+*bass:	portion of shrimp, mussels, sea bass and whatnot in a spicy,
+*bass:	-- OPTIONAL MATERIAL FOLLOWS.) Striped bass are also being spotted in
+*bass:	source of entertainment is pay-per-view bass fishing. Yet this is still
+*bass:	herring and the enormous striped bass that feed on them. It
+*bass:	and dining on Chilean sea bass and poached peaches. <DOC id="APW20010228.0028"
+*bass:	<DOC id="NYT20010802.0256" type="story" > Japan's bass fisherman become homeland heroes New
+*bass:	restaurant, waiters serve pecan-crusted sea bass ($18.95) and peppered rib eye
+"""
+
+def process_corpus(text):
+    # split the text into its individual senses and contexts
+    corpus = text.split("\n")
+    # split the sense from the context
+    corpus = [l.split("\t") for l in corpus if l != '']
+    # strip the colon from the sense
+    corpus = [[l[0][:-1], l[1]] for l in corpus]
+    # remove XML tags from corpus
+    corpus = [[l[0], re.sub(r'\<.*?(\>|$)', '', l[1])] for l in corpus]
+    # Punkt tokenize the context
+    corpus = [[l[0], tokenizer.tokenize(l[1].lower())] for l in corpus]
+    # Get rid of stop words and punctuation from the context
+    stop_words = stopwords.words("english")
+    stop_words.extend(string.punctuation)
+    # only keep context words that aren't in our stop words list
+    corpus = [[l[0], [w for w in l[1] if w not in stop_words]] for l in corpus]
+
+    pp.pprint(corpus)
+    print(stop_words)
+    return corpus
 
 def main(args):
     print args
+    print test_data
+    corpus = process_corpus(test_data)
+
+    prev_word_cfdist = ConditionalFreqDist()
+    for l in corpus:
+        root = re.sub(r'\*', '', l[0])
+        probs(prev_word_cfdist, root, l[0], l[1])
+    #prev_word_cpdist = ConditionalProbDist(prev_word_cfdist, LaplaceProbDist)
+    #prev_word_cpdist = ConditionalProbDist(prev_word_cfdist, LidstoneProbDist, 0.1)
+    prev_word_cpdist = ConditionalProbDist(prev_word_cfdist, UniformProbDist)
+    print(prev_word_cpdist["bass"].prob("sea"))
+
+def probs(cfd, root_word, sense_word, context):
+    root_word_i = context.index(root_word)
+    prev_word_i = root_word_i - 1
+    prev_word = context[prev_word_i]
+
+    cfd[sense_word][prev_word] += 1
+    #condition = sense_word + "_pword_" + prev_word
+    #bigrams = nltk.bigrams(text)
+    #cfd_bigrams = Counter(bigrams)
+    #cfd_unigrams = Counter(list(text))
+
+    print(root_word, root_word_i)
+    print(prev_word, prev_word_i)
+    print(context)
 
 class DecisionListClassifier():
     """
@@ -87,5 +163,4 @@ if __name__ == "__main__":
     parser.add_argument( "-p", "--predict",
                           help = "pass a phrase to predict the sense of" )
     args = parser.parse_args()
-
     main(args)
