@@ -118,46 +118,80 @@ class DecisionListClf(object):
     def fit(self):
         # creates self.cfd and self.cpd
         self.generate_distributions()
-        self.decision_list = self.generate_decision_list()
+        self.generate_decision_list()
+
+    def predict(self, context):
+        if type(context) != list:
+            context = self.clean_text(context)
+
+        for rule in self.decision_list:
+            if self.check_rule(context, rule[0]):
+                # + implies root, - implies root_star
+                if rule[1] > 0:
+                    return self.root
+                elif rule[1] < 0:
+                    return self.root_star
 
     def generate_distributions(self):
         self.cfd = ConditionalFreqDist()
 
-        self.get_prev_word_dist(self.corpus)
-        self.get_next_word_dist(self.corpus)
+        self.prev_word_dist(self.corpus)
+        self.next_word_dist(self.corpus)
 
         #self.cpd = ConditionalProbDist(cfd, LaplaceProbDist)
         self.cpd = ConditionalProbDist(self.cfd, LidstoneProbDist, 0.1)
         #self.cpd = ConditionalProbDist(cfd, UniformProbDist)
 
-    def get_prev_word_dist(self, corpus):
+    def prev_word_dist(self, corpus):
         for line in corpus:
-            sense = line[0]
-            context = line[1]
-            root_word_i = context.index(self.root)
-            prev_word_i = root_word_i - 1
-            prev_word = context[prev_word_i]
+            sense, context = line[0], line[1]
+            prev_word = self.prev_word(context, self.root)
             # create freqdist for each sense per word
             condition = "pword_" + prev_word
             self.cfd[condition][sense] += 1
 
-    def get_next_word_dist(self, corpus):
+    def next_word_dist(self, corpus):
         for line in corpus:
-            sense = line[0]
-            context = line[1]
-            root_word_i = context.index(self.root)
-            next_word_i = root_word_i + 1
-            next_word = context[next_word_i]
+            sense, context = line[0], line[1]
+            next_word = self.next_word(context, self.root)
             # create freqdist for each sense per word
             condition = "nword_" + next_word
             self.cfd[condition][sense] += 1
+
+    def check_next_word(self, context, word):
+        next_word = self.next_word(context, self.root)
+        return next_word == word
+
+    def check_prev_word(self, context, word):
+        prev_word = self.prev_word(context, self.root)
+        return prev_word == word
+
+    def prev_word(self, context, word):
+        word_i = context.index(word)
+        prev_word_i = word_i - 1
+        print(context)
+        return context[prev_word_i]
+
+    def next_word(self, context, word):
+        word_i = context.index(self.root)
+        next_word_i = word_i + 1
+        return context[next_word_i]
+
+    def check_rule(self, context, rule):
+        rule_type, rule_word = rule.split("_")
+        #print(rule_type, rule_word)
+
+        if rule_type == "pword":
+            #print("pword")
+            return self.check_prev_word(context, rule_word)
+        elif rule_type == "nword":
+            #print("nword")
+            return self.check_next_word(context, rule_word)
 
     def generate_decision_list(self):
         for rule in self.cpd.conditions():
             likelihood = self.calculate_log_likelihood(rule)
             self.decision_list.append([rule, likelihood])
-            #print [rule, likelihood]
-
         # instead of always applying the abs, I opted to apply only while
         # sorting, as the sign is an easy way to denote sense:
         # + for root / - for root star
@@ -175,10 +209,12 @@ class DecisionListClf(object):
     def score(self, data):
         pass
 
-    def predict(self, data):
-        pass
-
     def process_corpus(self, text):
+        """
+        Process an input of the form:
+        word*   context of word to train the classifier on
+        word    context of the word with a different sense
+        """
         # split the text into its individual senses and contexts
         corpus = text.split("\n")
         # split the sense from the context
@@ -198,13 +234,28 @@ class DecisionListClf(object):
         self.root = re.sub(r'\*', '', corpus[0][0])
         self.root_star = "*" + self.root
         #pp.pprint(corpus)
-        #print(stop_words)
         return corpus
+
+    def clean_text(self, text):
+        """
+        Process raw text without sense information
+        """
+        # remove XML tags from corpus
+        text = re.sub(r'\<.*?(\>|$)', '', text)
+        # Punkt tokenize the context
+        text = tokenizer.tokenize(text)
+        # Get rid of stop words and punctuation from the context
+        stop_words = stopwords.words("english")
+        stop_words.extend(string.punctuation)
+        # only keep context words that aren't in our stop words list
+        text = [w.lower() for w in text if w not in stop_words]
+        #pp.pprint(text)
+        return text
+
 
     def test_based_on_paper_results(self):
         # Should equal ~7.14 according to Yarowsky given test data string
         print(self.calculate_log_likelihood("pword_sea"))
-
 
 def main(args):
     #print args
@@ -213,6 +264,7 @@ def main(args):
     #fit(corpus)
     clf = DecisionListClf(test_data)
     clf.test_based_on_paper_results()
+    print(clf.predict("restaurant, waiters serve pecan-crusted sea bass ($18.95) and peppered rib eye"))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
