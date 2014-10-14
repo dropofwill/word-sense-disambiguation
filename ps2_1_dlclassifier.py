@@ -124,8 +124,8 @@ def main(args):
     #print(prev_cpd["*bass"].prob('composer'))
     #print(prev_cpd["bass"].freq('pay-per-view'))
 
-    sea_fish = prev_cfd["*bass"].freq('sea') + 0.1
-    sea_music = prev_cfd["bass"].freq('sea') + 0.1
+    sea_fish = prev_cpd["sea"].prob('bass')
+    sea_music = prev_cpd["sea"].prob('*bass')
     sea_div = sea_fish / sea_music
     sea_log = math.log(sea_div, 2)
     sea_abs = math.fabs(sea_log)
@@ -165,7 +165,8 @@ def get_prev_word_dist(corpus):
         prev_word_i = root_word_i - 1
         prev_word = context[prev_word_i]
         # create freqdist for each sense per word
-        cfd[sense][prev_word] += 1
+        #cfd[sense][prev_word] += 1
+        cfd[prev_word][sense] += 1
 
     #cpd = ConditionalProbDist(cfd, LaplaceProbDist)
     cpd = ConditionalProbDist(cfd, LidstoneProbDist, 0.1)
