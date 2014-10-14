@@ -104,24 +104,9 @@ def process_corpus(text):
     # only keep context words that aren't in our stop words list
     corpus = [[l[0], [w for w in l[1] if w not in stop_words]] for l in corpus]
 
-    pp.pprint(corpus)
-    print(stop_words)
+    #pp.pprint(corpus)
+    #print(stop_words)
     return corpus
-
-def test_based_on_paper_results(cpd):
-    sea_fish = cpd["pword_sea"].prob('bass')
-    sea_music = cpd["pword_sea"].prob('*bass')
-    sea_div = sea_fish / sea_music
-    sea_log = math.log(sea_div, 2)
-    sea_abs = math.fabs(sea_log)
-
-    print(cpd.conditions())
-    print(sea_fish)
-    print(sea_music)
-    print(sea_div)
-    print(sea_log)
-    print(sea_abs)
-
 def fit(corpus):
     cpd = generate_conditional_probdist(corpus)
     decision_list = generate_decision_list(cpd)
@@ -144,12 +129,6 @@ def generate_decision_list(cpd):
 
 def predict(test_data):
     pass
-
-def main(args):
-    print args
-    print test_data
-    corpus = process_corpus(test_data)
-    fit(corpus)
 
 def get_prev_word_dist(corpus, cfd):
     for line in corpus:
@@ -179,33 +158,123 @@ def get_next_word_dist(corpus, cfd):
         cfd[condition][sense] += 1
     return cfd
 
-class DecisionListClassifier():
+class DecisionListClf(object):
+    """
+    Implements the Supervised Yarowsky Decision list for the homograph
+    disambiguation problem.
+
+    Constructor takes as input a string of test data of the form:
+    word*   context of word to train the classifier on
+    word    context of the word with a different sense
     """
 
-    """
+    def __init__(self, test_data):
+        # The corpus split into a two part list [sense, [context, tokens]]
+        # It handles basic normalization by removing English stop words,
+        # punctuation, and XML tags
+        self.corpus = self.process_corpus(test_data)
+        # Uses NLTK's ConditionalFreqDist to count up frequencies
+        self.cfd = None
+        # Uses NLTK's ConditionalProbDist and one of the ProbDistI classes to
+        # calculate probabilities and smooth counts respectively
+        self.cpd = None
+        # Creates a list of rules sorted by their log likelihood
+        self.decision_list = None
+        # Generates the three above attrs from the test data
+        self.fit(self.corpus)
 
-    def __init__(self):
+    def fit(self, corpus):
+        # creates self.cfd and self.cpd
+        self.generate_distributions(corpus)
+        self.decision_list = self.generate_decision_list(self.cpd)
+
+    def generate_distributions(self, corpus):
+        self.cfd = ConditionalFreqDist()
+
+        self.get_prev_word_dist(corpus)
+        self.get_next_word_dist(corpus)
+
+        #self.cpd = ConditionalProbDist(cfd, LaplaceProbDist)
+        self.cpd = ConditionalProbDist(self.cfd, LidstoneProbDist, 0.1)
+        #self.cpd = ConditionalProbDist(cfd, UniformProbDist)
+
+    def get_prev_word_dist(self, corpus):
+        for line in corpus:
+            sense = line[0]
+            context = line[1]
+            # remove the * marking the sense
+            root_word = re.sub(r'\*', '', line[0])
+            root_word_i = context.index(root_word)
+            prev_word_i = root_word_i - 1
+            prev_word = context[prev_word_i]
+            # create freqdist for each sense per word
+            condition = "pword_" + prev_word
+            self.cfd[condition][sense] += 1
+
+    def get_next_word_dist(self, corpus):
+        for line in corpus:
+            sense = line[0]
+            context = line[1]
+            # remove the * marking the sense
+            root_word = re.sub(r'\*', '', line[0])
+            root_word_i = context.index(root_word)
+            next_word_i = root_word_i + 1
+            next_word = context[next_word_i]
+            # create freqdist for each sense per word
+            condition = "nword_" + next_word
+            self.cfd[condition][sense] += 1
+
+    def generate_decision_list(self, cpd):
         pass
 
-    def fit(data, targets=None):
+    def score(self, data):
         pass
 
-    def fit_transform(data):
-        X = transform(data)
-        fit(X)
-
-    def score(data):
+    def predict(self, data):
         pass
 
-    def predict(data):
-        pass
+    def process_corpus(self, text):
+        # split the text into its individual senses and contexts
+        corpus = text.split("\n")
+        # split the sense from the context
+        corpus = [l.split("\t") for l in corpus if l != '']
+        # strip the colon from the sense
+        corpus = [[l[0][:-1], l[1]] for l in corpus]
+        # remove XML tags from corpus
+        corpus = [[l[0], re.sub(r'\<.*?(\>|$)', '', l[1])] for l in corpus]
+        # Punkt tokenize the context
+        corpus = [[l[0], tokenizer.tokenize(l[1].lower())] for l in corpus]
+        # Get rid of stop words and punctuation from the context
+        stop_words = stopwords.words("english")
+        stop_words.extend(string.punctuation)
+        # only keep context words that aren't in our stop words list
+        corpus = [[l[0], [w for w in l[1] if w not in stop_words]] for l in corpus]
+        #pp.pprint(corpus)
+        #print(stop_words)
+        return corpus
 
-    def predict_proba(data):
-        pass
+    def test_based_on_paper_results(self):
+        sea_fish = self.cpd["pword_sea"].prob('bass')
+        sea_music = self.cpd["pword_sea"].prob('*bass')
+        sea_div = sea_fish / sea_music
+        sea_log = math.log(sea_div, 2)
+        sea_abs = math.fabs(sea_log)
 
-    def transform(data):
-        pass
+        print(self.cpd.conditions())
+        print(sea_fish)
+        print(sea_music)
+        print(sea_div)
+        print(sea_log)
+        print(sea_abs)
 
+
+def main(args):
+    #print args
+    #print test_data
+    #corpus = process_corpus(test_data)
+    #fit(corpus)
+    clf = DecisionListClf(test_data)
+    clf.test_based_on_paper_results()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
