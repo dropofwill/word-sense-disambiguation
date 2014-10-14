@@ -7,12 +7,13 @@ TODO:
     Procedure:
     √ Read Supervised Paper
     √ Review Class Notes
-    √ Preprocess the data, tokenize, remove punctuation, POS tag, & remove xml bits
+    √ Preprocess the data, tokenize, remove punctuation, & remove xml bits
+    POS tag
     Select features, +/- k word, +/- k POS, k = {1,2} words within +/- 5
     √ For each feature calculate the log likelihood based on the training corpus
     √ Smooth the counts, with Laplace/Lidstone for instance
-    Rank the rules in a decision list based on probabilities
-    Classify test data with the most predictive rule that matches
+    √ Rank the rules in a decision list based on probabilities
+    √ Classify test data with the most predictive rule that matches
     ---
     Report:
     1-2 paragraph summary of the paper: assumptions, other use cases?
@@ -20,8 +21,8 @@ TODO:
     Report the top-10 rules per case
     Report on the performance:
         For each case what was the test set baseline:
-            Prior Probability of the majority class
-            Actual Majority class label
+            √ Prior Probability of the majority class
+            √ Actual Majority class label
         Comparison to baseline, actual accuracy and % error reduction over baseline
         Compute precision and recall by sense on each test set
         Compute macro average by weighing each class equally
@@ -54,6 +55,7 @@ from nltk.probability import ConditionalProbDist
 from nltk.probability import LaplaceProbDist
 from nltk.probability import LidstoneProbDist
 from nltk.probability import UniformProbDist
+from nltk.metrics import ConfusionMatrix
 from nltk.corpus import stopwords
 from nltk.tokenize.punkt import PunktWordTokenizer
 from nltk.tokenize import RegexpTokenizer
@@ -93,18 +95,24 @@ class DecisionListClf(object):
     disambiguation problem.
 
     Constructor takes as input a string of test data of the form:
-    word*   context of word to train the classifier on
-    word    context of the word with a different sense
+    *word:  context of word to train the classifier on
+    word:   context of the word with a different sense
     """
 
-    def __init__(self, test_data):
+    def __init__(self, train_data, test_data = None):
         # root word without and with the prepended *
         self.root = None        # + likelihood denotes this sense
         self.root_star = None   # - likelihood denotes this sense
-        # The corpus split into a two part list [sense, [context, tokens]]
+        # The train split into a two part list [sense, [context, tokens]]
         # It handles basic normalization by removing English stop words,
         # punctuation, and XML tags
-        self.corpus = self.process_corpus(test_data)
+        self.train = self.process_corpus(train_data)
+
+        if test_data:
+            self.test = self.process_corpus(test_data)
+        else:
+            self.test = None
+
         # Uses NLTK's ConditionalFreqDist to count up frequencies
         self.cfd = None
         # Uses NLTK's ConditionalProbDist and one of the ProbDistI classes to
@@ -112,15 +120,86 @@ class DecisionListClf(object):
         self.cpd = None
         # Creates a list of rules sorted by their log likelihood
         self.decision_list = []
-        # Generates the three above attrs from the test data
+        # Generates the above from the train data
         self.fit()
+
+        self.prior_probability = None
+        self.majority_label = None
 
     def fit(self):
         # creates self.cfd and self.cpd
         self.generate_distributions()
         self.generate_decision_list()
 
+    def evaluate(self, test_data=None):
+        if not self.test:
+            self.test = self.process_corpus(test_data)
+
+        root_prior, root_star_prior = 0, 0
+        for line in self.train:
+            if line[0] == self.root:
+                root_prior += 1
+            elif line[0] == self.root_star:
+                root_star_prior += 1
+            else:
+                print("warning no match")
+
+        total = root_star_prior + root_prior
+        root_prior = float(root_prior) / float(total)
+        root_star_prior = float(root_star_prior) / float(total)
+
+        if root_star_prior > root_prior:
+            self.majority_label = self.root_star
+            self.prior_probability = root_star_prior
+        else:
+            self.majority_label = self.root
+            self.prior_probability = root_prior
+
+        #print(self.root, root_prior)
+        #print(self.root_star, root_star_prior)
+        prediction_list, actual_list = [], []
+        for context in self.test:
+            #print(context)
+            prediction, actual = self.predict(context)
+            prediction_list.append(prediction)
+            actual_list.append(actual)
+
+        #print(prediction_list, actual_list)
+        cm = ConfusionMatrix(actual_list, prediction_list)
+        print(cm)
+
+        #for condition in self.cfd.conditions():
+            #print(condition)
+            #root_prior += self.cfd[condition][self.root]
+            #root_star_prior += self.cfd[condition][self.root_star]
+            #print(self.cfd[condition][self.root])
+            #print(self.cfd[condition][self.root_star])
+            #print(self.cfd[condition].freq(self.root))
+            #print(self.cfd[condition].freq(self.root_star))
+
     def predict(self, context):
+        """
+        Predict with ground truth in the same form as the train data
+        Returns tuple of the form (*sense, success?) where success is a boolean
+        """
+        if type(context) != list:
+            context = self.process_corpus(context)
+
+        for rule in self.decision_list:
+            if self.check_rule(context[1], rule[0]):
+                # + implies root, - implies root_star
+                if rule[1] > 0:
+                    return (self.root, context[0])
+                elif rule[1] < 0:
+                    return (self.root_star, context[0])
+
+        # Default to majority label
+        return (self.majority_label, context[0])
+
+    def predict_unk(self, context):
+        """
+        Predict without any ground truth
+        """
         if type(context) != list:
             context = self.clean_text(context)
 
@@ -132,11 +211,14 @@ class DecisionListClf(object):
                 elif rule[1] < 0:
                     return self.root_star
 
+        # Default to majority label
+        return (self.majority_label, context[0] == self.majority_label)
+
     def generate_distributions(self):
         self.cfd = ConditionalFreqDist()
 
-        self.prev_word_dist(self.corpus)
-        self.next_word_dist(self.corpus)
+        self.prev_word_dist(self.train)
+        self.next_word_dist(self.train)
 
         #self.cpd = ConditionalProbDist(cfd, LaplaceProbDist)
         self.cpd = ConditionalProbDist(self.cfd, LidstoneProbDist, 0.1)
@@ -169,13 +251,18 @@ class DecisionListClf(object):
     def prev_word(self, context, word):
         word_i = context.index(word)
         prev_word_i = word_i - 1
-        print(context)
-        return context[prev_word_i]
+        if prev_word_i >= 0:
+            return context[prev_word_i]
+        else:
+            return "<s>"
 
     def next_word(self, context, word):
         word_i = context.index(self.root)
         next_word_i = word_i + 1
-        return context[next_word_i]
+        if len(context) > next_word_i:
+            return context[next_word_i]
+        else:
+            return "</s>"
 
     def check_rule(self, context, rule):
         rule_type, rule_word = rule.split("_")
@@ -212,8 +299,8 @@ class DecisionListClf(object):
     def process_corpus(self, text):
         """
         Process an input of the form:
-        word*   context of word to train the classifier on
-        word    context of the word with a different sense
+        *word:  context of word to train the classifier on
+        word:   context of the word with a different sense
         """
         # split the text into its individual senses and contexts
         corpus = text.split("\n")
@@ -252,25 +339,33 @@ class DecisionListClf(object):
         #pp.pprint(text)
         return text
 
-
     def test_based_on_paper_results(self):
         # Should equal ~7.14 according to Yarowsky given test data string
         print(self.calculate_log_likelihood("pword_sea"))
 
+
 def main(args):
     #print args
     #print test_data
-    #corpus = process_corpus(test_data)
-    #fit(corpus)
-    clf = DecisionListClf(test_data)
-    clf.test_based_on_paper_results()
-    print(clf.predict("restaurant, waiters serve pecan-crusted sea bass ($18.95) and peppered rib eye"))
+    if args.train and args.test:
+        train_text = open(args.train, 'r')
+        test_text = open(args.test, 'r')
+        train_text = train_text.read()
+        test_text = test_text.read()
+        print(train_text)
+        print(test_text)
+        clf = DecisionListClf(train_text)
+        clf.evaluate(test_text)
+    else:
+        clf = DecisionListClf(test_data)
+        clf.test_based_on_paper_results()
+        print(clf.predict_unk("restaurant, waiters serve pecan-crusted sea bass ($18.95) and peppered rib eye"))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument( "-X", "-t", "--train",
+    parser.add_argument( "-t", "--train",
                           help = "pass a file path to the train data" )
-    parser.add_argument( "-y", "-s", "--test",
+    parser.add_argument( "-s", "--test",
                           help = "pass a file path to the test data" )
     parser.add_argument( "-p", "--predict",
                           help = "pass a phrase to predict the sense of" )
