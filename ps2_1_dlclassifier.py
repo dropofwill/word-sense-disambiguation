@@ -99,8 +99,8 @@ class DecisionListClf(object):
 
     def __init__(self, test_data):
         # root word without and with the prepended *
-        self.root = None
-        self.root_star = None
+        self.root = None        # + likelihood denotes this sense
+        self.root_star = None   # - likelihood denotes this sense
         # The corpus split into a two part list [sense, [context, tokens]]
         # It handles basic normalization by removing English stop words,
         # punctuation, and XML tags
@@ -111,20 +111,20 @@ class DecisionListClf(object):
         # calculate probabilities and smooth counts respectively
         self.cpd = None
         # Creates a list of rules sorted by their log likelihood
-        self.decision_list = None
+        self.decision_list = []
         # Generates the three above attrs from the test data
-        self.fit(self.corpus)
+        self.fit()
 
-    def fit(self, corpus):
+    def fit(self):
         # creates self.cfd and self.cpd
-        self.generate_distributions(corpus)
-        self.decision_list = self.generate_decision_list(self.cpd)
+        self.generate_distributions()
+        self.decision_list = self.generate_decision_list()
 
-    def generate_distributions(self, corpus):
+    def generate_distributions(self):
         self.cfd = ConditionalFreqDist()
 
-        self.get_prev_word_dist(corpus)
-        self.get_next_word_dist(corpus)
+        self.get_prev_word_dist(self.corpus)
+        self.get_next_word_dist(self.corpus)
 
         #self.cpd = ConditionalProbDist(cfd, LaplaceProbDist)
         self.cpd = ConditionalProbDist(self.cfd, LidstoneProbDist, 0.1)
@@ -152,14 +152,25 @@ class DecisionListClf(object):
             condition = "nword_" + next_word
             self.cfd[condition][sense] += 1
 
-    def generate_decision_list(self, cpd):
-        pass
+    def generate_decision_list(self):
+        for rule in self.cpd.conditions():
+            likelihood = self.calculate_log_likelihood(rule)
+            self.decision_list.append([rule, likelihood])
+            #print [rule, likelihood]
+
+        # instead of always applying the abs, I opted to apply only while
+        # sorting, as the sign is an easy way to denote sense:
+        # + for root / - for root star
+        self.decision_list.sort(key=lambda rule: math.fabs(rule[1]), reverse=True)
+        pp.pprint(self.decision_list)
 
     def calculate_log_likelihood(self, rule):
         prob = self.cpd[rule].prob(self.root)
         prob_star = self.cpd[rule].prob(self.root_star)
         div = prob / prob_star
-        return math.fabs(math.log(div, 2))
+        # -means prob_star, +means prob
+        return math.log(div, 2)
+        #return math.fabs(math.log(div, 2))
 
     def score(self, data):
         pass
@@ -191,19 +202,7 @@ class DecisionListClf(object):
         return corpus
 
     def test_based_on_paper_results(self):
-        # Should equal 7.14 according to Yarowsky given test data string
-        #sea_fish = self.cpd["pword_sea"].prob('bass')
-        #sea_music = self.cpd["pword_sea"].prob('*bass')
-        #sea_div = sea_fish / sea_music
-        #sea_log = math.log(sea_div, 2)
-        #sea_abs = math.fabs(sea_log)
-
-        #print(self.cpd.conditions())
-        #print(sea_fish)
-        #print(sea_music)
-        #print(sea_div)
-        #print(sea_log)
-        #print(sea_abs)
+        # Should equal ~7.14 according to Yarowsky given test data string
         print(self.calculate_log_likelihood("pword_sea"))
 
 
