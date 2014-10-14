@@ -87,77 +87,6 @@ bass:	valued at $250,000. Another double bass trapped in the room is
 *bass:	restaurant, waiters serve pecan-crusted sea bass ($18.95) and peppered rib eye
 """
 
-def process_corpus(text):
-    # split the text into its individual senses and contexts
-    corpus = text.split("\n")
-    # split the sense from the context
-    corpus = [l.split("\t") for l in corpus if l != '']
-    # strip the colon from the sense
-    corpus = [[l[0][:-1], l[1]] for l in corpus]
-    # remove XML tags from corpus
-    corpus = [[l[0], re.sub(r'\<.*?(\>|$)', '', l[1])] for l in corpus]
-    # Punkt tokenize the context
-    corpus = [[l[0], tokenizer.tokenize(l[1].lower())] for l in corpus]
-    # Get rid of stop words and punctuation from the context
-    stop_words = stopwords.words("english")
-    stop_words.extend(string.punctuation)
-    # only keep context words that aren't in our stop words list
-    corpus = [[l[0], [w for w in l[1] if w not in stop_words]] for l in corpus]
-
-    #pp.pprint(corpus)
-    #print(stop_words)
-    return corpus
-def fit(corpus):
-    cpd = generate_conditional_probdist(corpus)
-    decision_list = generate_decision_list(cpd)
-
-    return decision_list
-
-def generate_conditional_probdist(corpus):
-    cfd = ConditionalFreqDist()
-
-    cfd = get_prev_word_dist(corpus, cfd)
-    cfd = get_next_word_dist(corpus, cfd)
-
-    #cpd = ConditionalProbDist(cfd, LaplaceProbDist)
-    cpd = ConditionalProbDist(cfd, LidstoneProbDist, 0.1)
-    #cpd = ConditionalProbDist(cfd, UniformProbDist)
-    return cpd
-
-def generate_decision_list(cpd):
-    pass
-
-def predict(test_data):
-    pass
-
-def get_prev_word_dist(corpus, cfd):
-    for line in corpus:
-        sense = line[0]
-        context = line[1]
-        # remove the * marking the sense
-        root_word = re.sub(r'\*', '', line[0])
-        root_word_i = context.index(root_word)
-        prev_word_i = root_word_i - 1
-        prev_word = context[prev_word_i]
-        # create freqdist for each sense per word
-        condition = "pword_" + prev_word
-        cfd[condition][sense] += 1
-    return cfd
-
-def get_next_word_dist(corpus, cfd):
-    for line in corpus:
-        sense = line[0]
-        context = line[1]
-        # remove the * marking the sense
-        root_word = re.sub(r'\*', '', line[0])
-        root_word_i = context.index(root_word)
-        next_word_i = root_word_i + 1
-        next_word = context[next_word_i]
-        # create freqdist for each sense per word
-        condition = "nword_" + next_word
-        cfd[condition][sense] += 1
-    return cfd
-
 class DecisionListClf(object):
     """
     Implements the Supervised Yarowsky Decision list for the homograph
@@ -254,6 +183,7 @@ class DecisionListClf(object):
         return corpus
 
     def test_based_on_paper_results(self):
+        # Should equal 7.14 according to Yarowsky given test data string
         sea_fish = self.cpd["pword_sea"].prob('bass')
         sea_music = self.cpd["pword_sea"].prob('*bass')
         sea_div = sea_fish / sea_music
