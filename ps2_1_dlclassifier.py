@@ -157,25 +157,38 @@ class DecisionListClf(object):
 
         #print(self.root, root_prior)
         #print(self.root_star, root_star_prior)
-        prediction_list, actual_list = [], []
+        predictions, references = [], []
         for context in self.test:
-            #print(context)
-            prediction, actual = self.predict(context)
-            prediction_list.append(prediction)
-            actual_list.append(actual)
+            pred, ref = self.predict(context)
+            predictions.append(pred)
+            references.append(ref)
 
-        #print(prediction_list, actual_list)
-        cm = ConfusionMatrix(actual_list, prediction_list)
+        self.confustion_matrix(predictions, references)
+        print("Prior Probability Baseline: " + str(self.prior_probability))
+        print("Accuracy: " + str(self.accuracy(predictions, references)))
+
+    def confustion_matrix(self, predictions, references):
+        cm = ConfusionMatrix(references, predictions)
+        print("\n")
         print(cm)
 
-        #for condition in self.cfd.conditions():
-            #print(condition)
-            #root_prior += self.cfd[condition][self.root]
-            #root_star_prior += self.cfd[condition][self.root_star]
-            #print(self.cfd[condition][self.root])
-            #print(self.cfd[condition][self.root_star])
-            #print(self.cfd[condition].freq(self.root))
-            #print(self.cfd[condition].freq(self.root_star))
+    def accuracy(self, predictions, references):
+        correct, total = 0, 0
+        for i, p in enumerate(predictions):
+            if p == references[i]:
+                correct += 1
+            total += 1
+        return float(correct) / float(total)
+
+
+    def error_reduction(self, predictions, references):
+        pass
+
+    def precision(self, predictions, references):
+        pass
+
+    def recall(self, predictions, references):
+        pass
 
     def predict(self, context):
         """
