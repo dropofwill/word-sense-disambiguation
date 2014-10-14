@@ -65,9 +65,9 @@ pp = pprint.PrettyPrinter(indent=4)
 
 test_data = \
 """
+*bass:	portion of shrimp, mussels, sea bass and whatnot in a spicy,
 bass:	Stephan Weidner, the composer and bass player for Boehse Onkelz, a
 bass:	valued at $250,000. Another double bass trapped in the room is
-*bass:	portion of shrimp, mussels, sea bass and whatnot in a spicy,
 *bass:	-- OPTIONAL MATERIAL FOLLOWS.) Striped bass are also being spotted in
 *bass:	source of entertainment is pay-per-view bass fishing. Yet this is still
 *bass:	herring and the enormous striped bass that feed on them. It
@@ -98,6 +98,9 @@ class DecisionListClf(object):
     """
 
     def __init__(self, test_data):
+        # root word without and with the prepended *
+        self.root = None
+        self.root_star = None
         # The corpus split into a two part list [sense, [context, tokens]]
         # It handles basic normalization by removing English stop words,
         # punctuation, and XML tags
@@ -131,9 +134,7 @@ class DecisionListClf(object):
         for line in corpus:
             sense = line[0]
             context = line[1]
-            # remove the * marking the sense
-            root_word = re.sub(r'\*', '', line[0])
-            root_word_i = context.index(root_word)
+            root_word_i = context.index(self.root)
             prev_word_i = root_word_i - 1
             prev_word = context[prev_word_i]
             # create freqdist for each sense per word
@@ -144,9 +145,7 @@ class DecisionListClf(object):
         for line in corpus:
             sense = line[0]
             context = line[1]
-            # remove the * marking the sense
-            root_word = re.sub(r'\*', '', line[0])
-            root_word_i = context.index(root_word)
+            root_word_i = context.index(self.root)
             next_word_i = root_word_i + 1
             next_word = context[next_word_i]
             # create freqdist for each sense per word
@@ -155,6 +154,12 @@ class DecisionListClf(object):
 
     def generate_decision_list(self, cpd):
         pass
+
+    def calculate_log_likelihood(self, rule):
+        prob = self.cpd[rule].prob(self.root)
+        prob_star = self.cpd[rule].prob(self.root_star)
+        div = prob / prob_star
+        return math.fabs(math.log(div, 2))
 
     def score(self, data):
         pass
@@ -178,24 +183,28 @@ class DecisionListClf(object):
         stop_words.extend(string.punctuation)
         # only keep context words that aren't in our stop words list
         corpus = [[l[0], [w for w in l[1] if w not in stop_words]] for l in corpus]
+        # get root word without the * by looking at the first example
+        self.root = re.sub(r'\*', '', corpus[0][0])
+        self.root_star = "*" + self.root
         #pp.pprint(corpus)
         #print(stop_words)
         return corpus
 
     def test_based_on_paper_results(self):
         # Should equal 7.14 according to Yarowsky given test data string
-        sea_fish = self.cpd["pword_sea"].prob('bass')
-        sea_music = self.cpd["pword_sea"].prob('*bass')
-        sea_div = sea_fish / sea_music
-        sea_log = math.log(sea_div, 2)
-        sea_abs = math.fabs(sea_log)
+        #sea_fish = self.cpd["pword_sea"].prob('bass')
+        #sea_music = self.cpd["pword_sea"].prob('*bass')
+        #sea_div = sea_fish / sea_music
+        #sea_log = math.log(sea_div, 2)
+        #sea_abs = math.fabs(sea_log)
 
-        print(self.cpd.conditions())
-        print(sea_fish)
-        print(sea_music)
-        print(sea_div)
-        print(sea_log)
-        print(sea_abs)
+        #print(self.cpd.conditions())
+        #print(sea_fish)
+        #print(sea_music)
+        #print(sea_div)
+        #print(sea_log)
+        #print(sea_abs)
+        print(self.calculate_log_likelihood("pword_sea"))
 
 
 def main(args):
