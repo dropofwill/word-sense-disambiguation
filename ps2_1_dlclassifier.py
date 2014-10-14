@@ -1,17 +1,16 @@
+# -*- coding: utf-8 -*-
 """
 Supervised Decision List Classifier for Word Sense Disambiguation.
-
-Using Sklearns Base classifier as a guide for building the API
 
 TODO:
     ---
     Procedure:
-    Read Supervised Paper
-    Review Class Notes
-    Preprocess the data, tokenize, remove punctuation, POS tag, & remove xml bits
+    √ Read Supervised Paper
+    √ Review Class Notes
+    √ Preprocess the data, tokenize, remove punctuation, POS tag, & remove xml bits
     Select features, +/- k word, +/- k POS, k = {1,2} words within +/- 5
-    For each feature calculate the log likelihood based on the training corpus
-    Smooth the counts, with Laplace/Lidstone for instance
+    √ For each feature calculate the log likelihood based on the training corpus
+    √ Smooth the counts, with Laplace/Lidstone for instance
     Rank the rules in a decision list based on probabilities
     Classify test data with the most predictive rule that matches
     ---
@@ -109,53 +108,50 @@ def process_corpus(text):
     print(stop_words)
     return corpus
 
-def main(args):
-    print args
-    print test_data
-    corpus = process_corpus(test_data)
-
-    prev_cfd, prev_cpd = get_prev_word_dist(corpus)
-    #total = prev_cpd["*bass"].prob('sea') +prev_cpd["*bass"].prob('striped') +prev_cpd["*bass"].prob("'s") +prev_cpd["*bass"].prob('striped')
-    #print(total)
-    #print(prev_cpd["*bass"].prob('sea'))
-    #print(prev_cpd["*bass"].prob('striped'))
-    #print(prev_cpd["*bass"].prob("'s"))
-    #print(prev_cpd["*bass"].prob('striped'))
-    #print(prev_cpd["*bass"].prob('composer'))
-    #print(prev_cpd["bass"].freq('pay-per-view'))
-
-    sea_fish = prev_cpd["sea"].prob('bass')
-    sea_music = prev_cpd["sea"].prob('*bass')
+def test_based_on_paper_results(cpd):
+    sea_fish = cpd["pword_sea"].prob('bass')
+    sea_music = cpd["pword_sea"].prob('*bass')
     sea_div = sea_fish / sea_music
     sea_log = math.log(sea_div, 2)
     sea_abs = math.fabs(sea_log)
 
+    print(cpd.conditions())
     print(sea_fish)
     print(sea_music)
     print(sea_div)
     print(sea_log)
     print(sea_abs)
 
-    #sea_fish = prev_cfd["*bass"].freq('sea') + 0.1
-    #sea_music = prev_cfd["bass"].freq('sea') + 0.1
-    #sea_div = sea_fish / sea_music
-    #sea_log = math.log(sea_div, 2)
-    #sea_abs = math.fabs(sea_log)
+def fit(corpus):
+    cpd = generate_conditional_probdist(corpus)
+    decision_list = generate_decision_list(cpd)
 
-    #print(sea_fish)
-    #print(sea_music)
-    #print(sea_div)
-    #print(sea_log)
-    #print(sea_abs)
+    return decision_list
 
-    #print(prev_cpd["*bass"].prob("striped"))
-    #print(prev_cpd["bass"].prob("striped"))
-
-    #print(len(prev_cpd["*bass"].samples()))
-    #print(len(prev_cpd["bass"].samples()))
-
-def get_prev_word_dist(corpus):
+def generate_conditional_probdist(corpus):
     cfd = ConditionalFreqDist()
+
+    cfd = get_prev_word_dist(corpus, cfd)
+    cfd = get_next_word_dist(corpus, cfd)
+
+    #cpd = ConditionalProbDist(cfd, LaplaceProbDist)
+    cpd = ConditionalProbDist(cfd, LidstoneProbDist, 0.1)
+    #cpd = ConditionalProbDist(cfd, UniformProbDist)
+    return cpd
+
+def generate_decision_list(cpd):
+    pass
+
+def predict(test_data):
+    pass
+
+def main(args):
+    print args
+    print test_data
+    corpus = process_corpus(test_data)
+    fit(corpus)
+
+def get_prev_word_dist(corpus, cfd):
     for line in corpus:
         sense = line[0]
         context = line[1]
@@ -165,31 +161,23 @@ def get_prev_word_dist(corpus):
         prev_word_i = root_word_i - 1
         prev_word = context[prev_word_i]
         # create freqdist for each sense per word
-        #cfd[sense][prev_word] += 1
-        cfd[prev_word][sense] += 1
+        condition = "pword_" + prev_word
+        cfd[condition][sense] += 1
+    return cfd
 
-    #cpd = ConditionalProbDist(cfd, LaplaceProbDist)
-    cpd = ConditionalProbDist(cfd, LidstoneProbDist, 0.1)
-    #cpd = ConditionalProbDist(cfd, UniformProbDist)
-    return (cfd, cpd)
-
-def get_next_word_dist(corpus):
-    return (cfd, cpd)
-
-def probs(cfd, root_word, sense_word, context):
-    root_word_i = context.index(root_word)
-    prev_word_i = root_word_i - 1
-    prev_word = context[prev_word_i]
-
-    cfd[sense_word][prev_word] += 1
-    #condition = sense_word + "_pword_" + prev_word
-    #bigrams = nltk.bigrams(text)
-    #cfd_bigrams = Counter(bigrams)
-    #cfd_unigrams = Counter(list(text))
-
-    print(root_word, root_word_i)
-    print(prev_word, prev_word_i)
-    print(context)
+def get_next_word_dist(corpus, cfd):
+    for line in corpus:
+        sense = line[0]
+        context = line[1]
+        # remove the * marking the sense
+        root_word = re.sub(r'\*', '', line[0])
+        root_word_i = context.index(root_word)
+        next_word_i = root_word_i + 1
+        next_word = context[next_word_i]
+        # create freqdist for each sense per word
+        condition = "nword_" + next_word
+        cfd[condition][sense] += 1
+    return cfd
 
 class DecisionListClassifier():
     """
