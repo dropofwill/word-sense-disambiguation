@@ -200,10 +200,15 @@ class DecisionListClf(object):
             self.res["prior_probability"] = self.res["root_prior"]
 
         predictions, references = [], []
+        self.res["correct"], self.res["incorrect"] = [], []
         for context in self.test:
-            pred, ref = self.predict(context)
+            pred, ref, r, c = self.predict(context)
             predictions.append(pred)
             references.append(ref)
+            if pred == ref:
+                self.res["correct"] = (pred, ref, r, c)
+            elif pred != ref:
+                self.res["incorrect"] = (pred, ref, r, c)
 
         self.res["predictions"] = predictions
         self.res["references"] = references
@@ -226,31 +231,53 @@ class DecisionListClf(object):
                                             self.res["root_star_recall"], \
                                             self.res["root_recall"])
 
-
     def print_results(self):
-        print("{:<30}{:>}"
-                .format("Majority Class Prior Probability: ",
-                   str(self.res["prior_probability"])))
+        print("\n")
+        print(self.res["cm"])
+
+        print("{:<30}{:>.3%}"
+                .format("Majority Class Prior Prob: ",
+                   self.res["prior_probability"]))
         print("{:<30}{:>}"
                 .format("Majority Class Label: ", self.majority_label))
 
-        print(self.res["cm"])
-
-        print("{:<30}{:>}"
+        print("\n")
+        print("{:<30}{:>.3%}"
                 .format("Accuracy: ", self.res["accuracy"]))
-        print("{:<30}{:>}"
+        print("{:<30}{:>.3%}"
                 .format("Error: ", self.res["error"]))
-        print("Error Reduction over Baseline: " + str(self.res["error_reduction"]))
+        print("{:<30}{:>.3%}"
+                .format("Error Reduction / Baseline: ",
+                    self.res["error_reduction"]))
 
         print("\n")
-        print(self.root_star + " Precision: " + str(self.res["root_star_precision"]))
-        print(self.root + " Precision: " + str(self.res["root_precision"]))
-        print(self.root_star + " Recall: " + str(self.res["root_star_recall"]))
-        print(self.root + " Recall: " + str(self.res["root_recall"]))
+        print("{:<7}{:<23}{:>.3%}"
+                .format(self.root_star,
+                    "Precision: ",
+                    self.res["root_star_precision"]))
+        print("{:<7}{:<23}{:>.3%}"
+                .format(self.root,
+                    "Precision: ",
+                    self.res["root_precision"]))
+        print("{:<7}{:<23}{:>.3%}"
+                .format(self.root_star,
+                    "Recall: ",
+                    self.res["root_star_recall"]))
+        print("{:<7}{:<23}{:>.3%}"
+                .format(self.root,
+                    "Recall: ",
+                    self.res["root_recall"]))
 
-        print("Macro Precision: " + str(self.res["macro_precision"]))
-        print("Macro Recall: " + str(self.res["macro_recall"]))
+        print("\n")
+        print("{:<30}{:>.3%}"
+                .format("Macro Precision: ", self.res["macro_precision"]))
+        print("{:<30}{:>.3%}"
+                .format("Macro Recall: ", self.res["macro_recall"]))
 
+        print("\n")
+        print("Top Ten Rules:")
+        for l in self.decision_list[:10]:
+            print("{:<30}{:>.4}".format(l[0], l[1]))
 
     def confustion_matrix(self, predictions, references):
         return ConfusionMatrix(references, predictions)
@@ -319,7 +346,7 @@ class DecisionListClf(object):
     def predict(self, context):
         """
         Predict with ground truth in the same form as the train data
-        Returns tuple of the form (*sense, success?) where success is a boolean
+        Returns tuple of the form (prediction, actual, rule, context)
         """
         if type(context) != list:
             context = self.process_corpus(context)
@@ -329,13 +356,13 @@ class DecisionListClf(object):
                 # + implies root, - implies root_star
                 print(rule)
                 if rule[1] > 0:
-                    return (self.root, context[0])
+                    return (self.root, context[0], rule, context[1])
                 elif rule[1] < 0:
-                    return (self.root_star, context[0])
+                    return (self.root_star, context[0], rule, context[1])
 
+        #print(None)
         # Default to majority label
-        print(None)
-        return (self.majority_label, context[0])
+        return (self.majority_label, context[0], "default", context[1])
 
     def check_rule(self, context, tags, rule):
         """
