@@ -147,6 +147,8 @@ class DecisionListClf(object):
         self.prev_word_dist(self.train)
         self.next_word_dist(self.train)
         self.k_window_dist(self.train, 10)
+        self.k_tag_dist(self.train, 1)
+        self.k_tag_dist(self.train, -1)
 
         #if not dist_types:
             #self.prev_word_dist(self.train)
@@ -197,10 +199,6 @@ class DecisionListClf(object):
             self.majority_label = self.root
             self.res["prior_probability"] = self.res["root_prior"]
 
-        print("\n")
-        print("Majority Class Prior Probability: " + str(self.res["prior_probability"]))
-        print("Majority Class Label: " + self.majority_label)
-
         predictions, references = [], []
         for context in self.test:
             pred, ref = self.predict(context)
@@ -210,28 +208,17 @@ class DecisionListClf(object):
         self.res["predictions"] = predictions
         self.res["references"] = references
         self.res["cm"] = self.confustion_matrix(predictions, references)
-        print("\n")
-        print(self.res["cm"])
 
         self.res["accuracy"] = self.accuracy(predictions, references)
         self.res["error"] = 1.0 - self.res["accuracy"]
         self.res["baseline_error"] = 1.0 - self.res["prior_probability"]
         self.res["error_reduction"] = \
             self.error_reduction(self.res["error"], self.res["baseline_error"])
-        print("\n")
-        print(  "Accuracy: " + str(self.res["accuracy"]) + \
-                " | Error: " + str(self.res["error"]))
-        print("Error Reduction over Baseline: " + str(self.res["error_reduction"]))
 
         self.res["root_star_precision"], self.res["root_precision"] = \
                 self.precisions(self.res["cm"])
         self.res["root_star_recall"], self.res["root_recall"] = \
                 self.recalls(self.res["cm"])
-        print("\n")
-        print(self.root_star + " Precision: " + str(self.res["root_star_precision"]))
-        print(self.root + " Precision: " + str(self.res["root_precision"]))
-        print(self.root_star + " Recall: " + str(self.res["root_star_recall"]))
-        print(self.root + " Recall: " + str(self.res["root_recall"]))
 
         self.res["macro_precision"], self.res["macro_recall"] = self.macro_average( \
                                             self.res["root_star_precision"],\
@@ -239,8 +226,31 @@ class DecisionListClf(object):
                                             self.res["root_star_recall"], \
                                             self.res["root_recall"])
 
+
+    def print_results(self):
+        print("{:<30}{:>}"
+                .format("Majority Class Prior Probability: ",
+                   str(self.res["prior_probability"])))
+        print("{:<30}{:>}"
+                .format("Majority Class Label: ", self.majority_label))
+
+        print(self.res["cm"])
+
+        print("{:<30}{:>}"
+                .format("Accuracy: ", self.res["accuracy"]))
+        print("{:<30}{:>}"
+                .format("Error: ", self.res["error"]))
+        print("Error Reduction over Baseline: " + str(self.res["error_reduction"]))
+
+        print("\n")
+        print(self.root_star + " Precision: " + str(self.res["root_star_precision"]))
+        print(self.root + " Precision: " + str(self.res["root_precision"]))
+        print(self.root_star + " Recall: " + str(self.res["root_star_recall"]))
+        print(self.root + " Recall: " + str(self.res["root_recall"]))
+
         print("Macro Precision: " + str(self.res["macro_precision"]))
         print("Macro Recall: " + str(self.res["macro_recall"]))
+
 
     def confustion_matrix(self, predictions, references):
         return ConfusionMatrix(references, predictions)
@@ -315,7 +325,7 @@ class DecisionListClf(object):
             context = self.process_corpus(context)
 
         for rule in self.decision_list:
-            if self.check_rule(context[1], rule[0]):
+            if self.check_rule(context[1], context[2], rule[0]):
                 # + implies root, - implies root_star
                 print(rule)
                 if rule[1] > 0:
@@ -327,7 +337,7 @@ class DecisionListClf(object):
         print(None)
         return (self.majority_label, context[0])
 
-    def check_rule(self, context, rule):
+    def check_rule(self, context, tags, rule):
         """
         Given a rule and a context
         Returns whether the rule applies to the context
@@ -340,6 +350,8 @@ class DecisionListClf(object):
             return self.check_k_word(rule_scope, context, rule_feature)
         elif rule_type == "window":
             return self.check_k_window(rule_scope, context, rule_feature)
+        elif rule_type == "tag":
+            return self.check_k_tag(rule_scope, context, tags, rule_feature)
         else:
             return False
 
@@ -359,6 +371,15 @@ class DecisionListClf(object):
             if next_word:
                 # create freqdist for each sense per word
                 condition = "1_word_" + re.sub(r'\_', '', next_word)
+                self.cfd[condition][sense] += 1
+
+    def k_tag_dist(self, corpus, k):
+        for line in corpus:
+            sense, context, tags = line[0], line[1], line[2]
+            k_tag = self.get_k_tag(k, context, tags)
+            if k_tag:
+                # create freqdist for each sense per word
+                condition = str(k) + "_tag_" + k_tag
                 self.cfd[condition][sense] += 1
 
     def k_window_dist(self, corpus, k):
@@ -389,11 +410,22 @@ class DecisionListClf(object):
             k_ -= 1
         return False
 
+    def check_k_tag(self, k, context, tags, check_tag):
+        return self.get_k_tag(k, context, tags) == check_tag
+
     def get_k_word(self, k, context):
         root_i = context.index(self.root)
         k_word_i = root_i + k
-        if (len(context)) > k_word_i and k_word_i >= 0:
+        if len(context) > k_word_i and k_word_i >= 0:
             return context[k_word_i]
+        else:
+            return False
+
+    def get_k_tag(self, k, context, tags):
+        root_i = context.index(self.root)
+        k_tag_i = root_i + k
+        if len(tags) > k_tag_i and k_tag_i >= 0:
+            return tags[k_tag_i]
         else:
             return False
 
@@ -424,19 +456,31 @@ class DecisionListClf(object):
         # Get rid of stop words and punctuation from the context
         stop_words = stopwords.words("english")
         stop_words.extend(string.punctuation)
+
+        corpus = [[l[0], [w for w in tag.pos_tag(l[1])]] for l in corpus]
         # only keep context words that aren't in our stop words list
-        corpus = [[l[0], [w for w in l[1] if w not in stop_words]] for l in corpus]
+        corpus = [[l[0], [w for w in l[1] if w[0] not in stop_words]] for l in corpus]
         # get root word without the * by looking at the first example
         self.root = re.sub(r'\*', '', corpus[0][0])
         self.root_star = "*" + self.root
 
+        # Get pos tags, but store them in adjacent array because it makes
+        # root sense lookup easier
         pos_corpus = []
         for l in corpus:
             temp_w, temp_t = [], []
-            for w, t in tag.pos_tag(l[1]):
-               temp_w.append(w)
-               temp_t.append(t)
+            for w_t in l[1]:
+                temp_w.append(w_t[0])
+                temp_t.append(w_t[1])
             pos_corpus.append([l[0], temp_w, temp_t])
+
+        #pos_corpus = []
+        #for l in corpus:
+            #temp_w, temp_t = [], []
+            #for w, t in tag.pos_tag(l[1]):
+               #temp_w.append(w)
+               #temp_t.append(t)
+            #pos_corpus.append([l[0], temp_w, temp_t])
 
         pp.pprint(pos_corpus)
         return pos_corpus
@@ -456,6 +500,7 @@ def main(args):
         #print(test_text)
         clf = DecisionListClf(train_text)
         clf.evaluate(test_text)
+        clf.print_results()
     else:
         clf = DecisionListClf(test_data)
         clf.test_based_on_paper_results()
