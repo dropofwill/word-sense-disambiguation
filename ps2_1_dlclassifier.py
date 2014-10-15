@@ -8,8 +8,7 @@ TODO:
     √ Read Supervised Paper
     √ Review Class Notes
     √ Preprocess the data, tokenize, remove punctuation, & remove xml bits
-    POS tag
-    Select features, +/- k word, +/- k POS, k = {1,2} words within +/- 5
+    √ POS tag Select features, +/- k word, +/- k POS, k = {1,2} words within +/- 5
     √ For each feature calculate the log likelihood based on the training corpus
     √ Smooth the counts, with Laplace/Lidstone for instance
     √ Rank the rules in a decision list based on probabilities
@@ -18,16 +17,16 @@ TODO:
     Report:
     1-2 paragraph summary of the paper: assumptions, other use cases?
     Conceptually explain the process
-    Report the top-10 rules per case
-    Report on the performance:
-        For each case what was the test set baseline:
+    √ Report the top-10 rules per case
+    √ Report on the performance:
+        √ For each case what was the test set baseline:
             √ Prior Probability of the majority class
             √ Actual Majority class label
         √ Comparison to baseline, actual accuracy and % error reduction over baseline
         √ Compute precision and recall by sense on each test set
         √ Compute macro average by weighing each class equally
         √ Include confusion matrices for both cases with observations
-        Include 3 examples of correct and incorrect classification for each case
+        √ Include 3 examples of correct and incorrect classification for each case
     Based on these results provide a discussion/reflection.
         e.g. What influenced the results of the performance metrics?
         What does the confusion matrices tell you?
