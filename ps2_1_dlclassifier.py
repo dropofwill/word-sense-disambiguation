@@ -54,6 +54,7 @@ import nltk
 from nltk.probability import ConditionalFreqDist
 from nltk.probability import ConditionalProbDist
 from nltk.probability import LaplaceProbDist
+from nltk.probability import WittenBellProbDist
 from nltk.probability import LidstoneProbDist
 from nltk.probability import UniformProbDist
 from nltk import tag
@@ -134,36 +135,26 @@ class DecisionListClf(object):
         self.generate_distributions()
         self.generate_decision_list()
 
-    def generate_distributions(self, dist_types=None):
+    def generate_distributions(self, smooth=None):
         """
         Creates the conditional frequency and probability distributions to
         generate the decision list rules.
-        Defaults to use all available rules.
-        Optionally takes a list of rules to use as strings.
-        Currently supports ["-1_word", "1_word", "k_window"]
         """
         self.cfd = ConditionalFreqDist()
 
-        self.prev_word_dist(self.train)
-        self.next_word_dist(self.train)
-        self.k_window_dist(self.train, 10)
+        self.k_word_dist(self.train, 1)
+        self.k_word_dist(self.train, -1)
+        self.k_window_dist(self.train, 5)
         self.k_tag_dist(self.train, 1)
         self.k_tag_dist(self.train, -1)
 
-        #if not dist_types:
-            #self.prev_word_dist(self.train)
-            #self.next_word_dist(self.train)
-            #self.k_window_dist(self.train, 5)
-        #else:
-            #for rule_type in dist_types:
-                #if rule_type == "-1_word":
-                    #self.prev_word_dist(self.train)
-                #elif rule_type == "1_word":
-                    #self.next_word_dist(self.train)
-
-        #self.cpd = ConditionalProbDist(cfd, LaplaceProbDist)
-        self.cpd = ConditionalProbDist(self.cfd, LidstoneProbDist, 0.1)
-        #self.cpd = ConditionalProbDist(cfd, UniformProbDist)
+        if smooth:
+            self.cpd = ConditionalProbDist(self.cfd, smooth)
+        else:
+            #self.cpd = ConditionalProbDist(self.cfd, WittenBellProbDist, 3)
+            self.cpd = ConditionalProbDist(self.cfd, LidstoneProbDist, 0.1)
+            #self.cpd = ConditionalProbDist(cfd, LaplaceProbDist)
+            #self.cpd = ConditionalProbDist(cfd, UniformProbDist)
 
     def generate_decision_list(self):
         for rule in self.cpd.conditions():
@@ -173,7 +164,7 @@ class DecisionListClf(object):
         # sorting, as the sign is an easy way to denote sense:
         # + for root / - for root star
         self.decision_list.sort(key=lambda rule: math.fabs(rule[1]), reverse=True)
-        pp.pprint(self.decision_list)
+        #pp.pprint(self.decision_list)
 
     def evaluate(self, test_data=None):
         if test_data:
@@ -206,9 +197,9 @@ class DecisionListClf(object):
             predictions.append(pred)
             references.append(ref)
             if pred == ref:
-                self.res["correct"] = (pred, ref, r, c)
+                self.res["correct"].append([pred, ref, r, c])
             elif pred != ref:
-                self.res["incorrect"] = (pred, ref, r, c)
+                self.res["incorrect"].append([pred, ref, r, c])
 
         self.res["predictions"] = predictions
         self.res["references"] = references
@@ -232,7 +223,7 @@ class DecisionListClf(object):
                                             self.res["root_recall"])
 
     def print_results(self):
-        print("\n")
+        print("")
         print(self.res["cm"])
 
         print("{:<30}{:>.3%}"
@@ -241,7 +232,7 @@ class DecisionListClf(object):
         print("{:<30}{:>}"
                 .format("Majority Class Label: ", self.majority_label))
 
-        print("\n")
+        print("")
         print("{:<30}{:>.3%}"
                 .format("Accuracy: ", self.res["accuracy"]))
         print("{:<30}{:>.3%}"
@@ -250,7 +241,7 @@ class DecisionListClf(object):
                 .format("Error Reduction / Baseline: ",
                     self.res["error_reduction"]))
 
-        print("\n")
+        print("")
         print("{:<7}{:<23}{:>.3%}"
                 .format(self.root_star,
                     "Precision: ",
@@ -268,16 +259,29 @@ class DecisionListClf(object):
                     "Recall: ",
                     self.res["root_recall"]))
 
-        print("\n")
+        print("")
         print("{:<30}{:>.3%}"
                 .format("Macro Precision: ", self.res["macro_precision"]))
         print("{:<30}{:>.3%}"
                 .format("Macro Recall: ", self.res["macro_recall"]))
 
-        print("\n")
+        print("")
         print("Top Ten Rules:")
         for l in self.decision_list[:10]:
             print("{:<30}{:>.4}".format(l[0], l[1]))
+
+        print("")
+        print("3 Correct:")
+        for l in self.res["correct"][:3]:
+            print("Correctly Predicted: {} \n Rule: {}, log-likelihood: {} \n {}"
+                    .format(l[0], l[2][0], l[2][1], " ".join(l[3])))
+
+        print("")
+        print("3 Incorrect:")
+        for l in self.res["incorrect"][:3]:
+            print("Predicted: {}, was actually: {} \n Rule: {}, log-likelihood: {} \n {}"
+                    .format(l[0], l[1], l[2][0], l[2][1], " ".join(l[3])))
+
 
     def confustion_matrix(self, predictions, references):
         return ConfusionMatrix(references, predictions)
@@ -354,7 +358,7 @@ class DecisionListClf(object):
         for rule in self.decision_list:
             if self.check_rule(context[1], context[2], rule[0]):
                 # + implies root, - implies root_star
-                print(rule)
+                #print(rule)
                 if rule[1] > 0:
                     return (self.root, context[0], rule, context[1])
                 elif rule[1] < 0:
@@ -382,13 +386,13 @@ class DecisionListClf(object):
         else:
             return False
 
-    def prev_word_dist(self, corpus):
+    def k_word_dist(self, corpus, k):
         for line in corpus:
             sense, context = line[0], line[1]
-            prev_word = self.get_k_word(-1, context)
-            if prev_word:
+            k_word = self.get_k_word(k, context)
+            if k_word:
                 # create freqdist for each sense per word
-                condition = "-1_word_" + re.sub(r'\_', '', prev_word)
+                condition = str(k) + "_word_" + re.sub(r'\_', '', k_word)
                 self.cfd[condition][sense] += 1
 
     def next_word_dist(self, corpus):
@@ -461,8 +465,10 @@ class DecisionListClf(object):
         prob_star = self.cpd[rule].prob(self.root_star)
         div = prob / prob_star
         # -means prob_star, +means prob
-        return math.log(div, 2)
-        #return math.fabs(math.log(div, 2))
+        if div == 0:
+            return 0
+        else:
+            return math.log(div, 2)
 
     def process_corpus(self, text):
         """
@@ -483,16 +489,18 @@ class DecisionListClf(object):
         # Get rid of stop words and punctuation from the context
         stop_words = stopwords.words("english")
         stop_words.extend(string.punctuation)
-
+        # Get pos tags, but store them in adjacent array because it makes
+        # root sense lookup easier
         corpus = [[l[0], [w for w in tag.pos_tag(l[1])]] for l in corpus]
-        # only keep context words that aren't in our stop words list
-        corpus = [[l[0], [w for w in l[1] if w[0] not in stop_words]] for l in corpus]
+        # Remove punctuation from words
+        corpus = [[l[0], [(re.sub(r'[\.\,\?\!\'\"\-\_]','', w[0]), w[1]) for w in l[1]]] for l in corpus]
+        # only keep context words that aren't in our stop words list and that
+        # are shorter than two characters long
+        corpus = [[l[0], [w for w in l[1] if w[0] not in stop_words and len(w[0]) > 1]] for l in corpus]
         # get root word without the * by looking at the first example
         self.root = re.sub(r'\*', '', corpus[0][0])
         self.root_star = "*" + self.root
-
-        # Get pos tags, but store them in adjacent array because it makes
-        # root sense lookup easier
+        # Change the structure of the corpus
         pos_corpus = []
         for l in corpus:
             temp_w, temp_t = [], []
@@ -501,21 +509,14 @@ class DecisionListClf(object):
                 temp_t.append(w_t[1])
             pos_corpus.append([l[0], temp_w, temp_t])
 
-        #pos_corpus = []
-        #for l in corpus:
-            #temp_w, temp_t = [], []
-            #for w, t in tag.pos_tag(l[1]):
-               #temp_w.append(w)
-               #temp_t.append(t)
-            #pos_corpus.append([l[0], temp_w, temp_t])
-
-        pp.pprint(pos_corpus)
+        #pp.pprint(pos_corpus)
         return pos_corpus
 
     def test_based_on_paper_results(self):
         # Should equal ~7.14 according to Yarowsky given test data string
-        print(self.calculate_log_likelihood("pword_sea"))
-
+        #if self.train == test_data:
+            print("This likelihood should equal ~7.14 if it was feed the `test_data` string according to Yarowksy's paper")
+            print(self.calculate_log_likelihood("-1_word_sea"))
 
 def main(args):
     if args.train and args.test:
