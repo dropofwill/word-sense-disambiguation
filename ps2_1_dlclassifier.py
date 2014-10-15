@@ -132,7 +132,7 @@ class DecisionListClf(object):
         self.generate_decision_list()
 
     def evaluate(self, test_data=None):
-        if not self.test:
+        if test_data:
             self.test = self.process_corpus(test_data)
 
         root_prior, root_star_prior = 0, 0
@@ -163,14 +163,35 @@ class DecisionListClf(object):
             predictions.append(pred)
             references.append(ref)
 
-        self.confustion_matrix(predictions, references)
-        print("Prior Probability Baseline: " + str(self.prior_probability))
-        print("Accuracy: " + str(self.accuracy(predictions, references)))
+        confustion_matrix = self.confustion_matrix(predictions, references)
+        accuracy = self.accuracy(predictions, references)
+        error = float(1 - accuracy)
+        baseline_error = float(1 - self.prior_probability)
+        error_reduction = self.error_reduction(error, baseline_error)
+        root_star_precision, root_precision = self.precisions(confustion_matrix)
+        root_star_recall, root_recall = self.recalls(confustion_matrix)
+        macro_precision, macro_recall = self.macro_average(root_star_precision,\
+                                                            root_precision,
+                                                            root_star_recall,
+                                                            root_recall)
+        print("\n")
+        print(confustion_matrix)
+        print("\n")
+        print("Majority Class Prior Probability: " + str(self.prior_probability))
+        print("Majority Class Label: " + str(self.majority_label))
+        print("\n")
+        print("Accuracy: " + str(accuracy) + " | Error: " + str(error))
+        print("Error Reduction (%) over Baseline: " + str(error_reduction))
+        print("\n")
+        print(self.root_star + " Precision: " + str(root_star_precision))
+        print(self.root + " Precision: " + str(root_precision))
+        print(self.root_star + " Recall: " + str(root_star_recall))
+        print(self.root + " Recall: " + str(root_recall))
+        print("Macro Precision: " + str(macro_precision))
+        print("Macro Recall: " + str(macro_recall))
 
     def confustion_matrix(self, predictions, references):
-        cm = ConfusionMatrix(references, predictions)
-        print("\n")
-        print(cm)
+        return ConfusionMatrix(references, predictions)
 
     def accuracy(self, predictions, references):
         correct, total = 0, 0
@@ -180,15 +201,47 @@ class DecisionListClf(object):
             total += 1
         return float(correct) / float(total)
 
-
-    def error_reduction(self, predictions, references):
+    def error_reduction(self, my_error, base_error):
+        # 1 - (my error/baseline error)
+        return float(1) - (float(my_error) / float(base_error))
         pass
 
-    def precision(self, predictions, references):
-        pass
+    def precisions(self, cm):
+        confusions = cm._confusion
+        root_star_tp = confusions[0][0]
+        root_star_fp = confusions[0][1]
+        root_star_fn = confusions[1][0]
 
-    def recall(self, predictions, references):
-        pass
+        root_tp = confusions[1][1]
+        root_fp = confusions[1][0]
+        root_fn = confusions[0][1]
+
+        root_star_precision = float(root_star_tp) / \
+                            ( float(root_star_tp) + float(root_star_fp) )
+        root_precision = float(root_tp) / \
+                            ( float(root_tp) + float(root_fp) )
+        return (root_star_precision, root_precision)
+
+    def recalls(self, cm):
+        confusions = cm._confusion
+        root_star_tp = confusions[0][0]
+        root_star_fp = confusions[0][1]
+        root_star_fn = confusions[1][0]
+
+        root_tp = confusions[1][1]
+        root_fp = confusions[1][0]
+        root_fn = confusions[0][1]
+
+        root_star_recall = float(root_star_tp) / \
+                         ( float(root_star_tp) + float(root_star_fn) )
+        root_recall = float(root_tp) / \
+                    ( float(root_tp) + float(root_fn) )
+        return (root_star_recall, root_recall)
+
+    def macro_average(self, p1, p2, r1, r2):
+        macro_precision = (float(p1) + float(p2)) / 2.0
+        macro_recall = (float(r1) + float(r2)) / 2.0
+        return (macro_precision, macro_recall)
 
     def predict(self, context):
         """
@@ -227,11 +280,25 @@ class DecisionListClf(object):
         # Default to majority label
         return (self.majority_label, context[0] == self.majority_label)
 
-    def generate_distributions(self):
+    def generate_distributions(self, dist_types=None):
+        """
+        Creates the conditional frequency and probability distributions to
+        generate the decision list rules.
+        Defaults to use all available rules.
+        Optionally takes a list of rules to use as strings.
+        Currently supports ["pword", "nword"]
+        """
         self.cfd = ConditionalFreqDist()
 
-        self.prev_word_dist(self.train)
-        self.next_word_dist(self.train)
+        if not dist_types:
+            self.prev_word_dist(self.train)
+            self.next_word_dist(self.train)
+        else:
+            for rule_type in dist_types:
+                if rule_type == "pword":
+                    self.prev_word_dist(self.train)
+                elif rule_type == "nword":
+                    self.next_word_dist(self.train)
 
         #self.cpd = ConditionalProbDist(cfd, LaplaceProbDist)
         self.cpd = ConditionalProbDist(self.cfd, LidstoneProbDist, 0.1)
@@ -241,17 +308,19 @@ class DecisionListClf(object):
         for line in corpus:
             sense, context = line[0], line[1]
             prev_word = self.prev_word(context, self.root)
-            # create freqdist for each sense per word
-            condition = "pword_" + prev_word
-            self.cfd[condition][sense] += 1
+            if prev_word:
+                # create freqdist for each sense per word
+                condition = "pword_" + prev_word
+                self.cfd[condition][sense] += 1
 
     def next_word_dist(self, corpus):
         for line in corpus:
             sense, context = line[0], line[1]
             next_word = self.next_word(context, self.root)
-            # create freqdist for each sense per word
-            condition = "nword_" + next_word
-            self.cfd[condition][sense] += 1
+            if next_word:
+                # create freqdist for each sense per word
+                condition = "nword_" + next_word
+                self.cfd[condition][sense] += 1
 
     def check_next_word(self, context, word):
         next_word = self.next_word(context, self.root)
@@ -267,7 +336,8 @@ class DecisionListClf(object):
         if prev_word_i >= 0:
             return context[prev_word_i]
         else:
-            return "<s>"
+            return False
+            #return "<s>"
 
     def next_word(self, context, word):
         word_i = context.index(self.root)
@@ -275,7 +345,11 @@ class DecisionListClf(object):
         if len(context) > next_word_i:
             return context[next_word_i]
         else:
-            return "</s>"
+            return False
+            #return "</s>"
+
+    def check_k_word(self, k, context, word):
+        pass
 
     def check_rule(self, context, rule):
         rule_type, rule_word = rule.split("_")
@@ -358,15 +432,13 @@ class DecisionListClf(object):
 
 
 def main(args):
-    #print args
-    #print test_data
     if args.train and args.test:
         train_text = open(args.train, 'r')
         test_text = open(args.test, 'r')
         train_text = train_text.read()
         test_text = test_text.read()
-        print(train_text)
-        print(test_text)
+        #print(train_text)
+        #print(test_text)
         clf = DecisionListClf(train_text)
         clf.evaluate(test_text)
     else:
