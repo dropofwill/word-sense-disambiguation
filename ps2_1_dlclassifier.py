@@ -50,11 +50,13 @@ import pprint
 import string
 import re
 import math
+import nltk
 from nltk.probability import ConditionalFreqDist
 from nltk.probability import ConditionalProbDist
 from nltk.probability import LaplaceProbDist
 from nltk.probability import LidstoneProbDist
 from nltk.probability import UniformProbDist
+from nltk import tag
 from nltk.metrics import ConfusionMatrix
 from nltk.corpus import stopwords
 from nltk.tokenize.punkt import PunktWordTokenizer
@@ -142,8 +144,8 @@ class DecisionListClf(object):
         """
         self.cfd = ConditionalFreqDist()
 
-        #self.prev_word_dist(self.train)
-        #self.next_word_dist(self.train)
+        self.prev_word_dist(self.train)
+        self.next_word_dist(self.train)
         self.k_window_dist(self.train, 10)
 
         #if not dist_types:
@@ -348,7 +350,6 @@ class DecisionListClf(object):
         Given a rule and a context
         Returns whether the rule applies to the context
         """
-        print(rule)
         rule_scope, rule_type, rule_feature = rule.split("_")
         rule_scope = int(rule_scope)
         #print(rule_scope, rule_type, rule_feature)
@@ -446,8 +447,17 @@ class DecisionListClf(object):
         # get root word without the * by looking at the first example
         self.root = re.sub(r'\*', '', corpus[0][0])
         self.root_star = "*" + self.root
-        #pp.pprint(corpus)
-        return corpus
+
+        pos_corpus = []
+        for l in corpus:
+            temp_w, temp_t = [], []
+            for w, t in tag.pos_tag(l[1]):
+               temp_w.append(w)
+               temp_t.append(t)
+            pos_corpus.append([l[0], temp_w, temp_t])
+
+        pp.pprint(pos_corpus)
+        return pos_corpus
 
     def clean_text(self, text):
         """
