@@ -327,24 +327,6 @@ class DecisionListClf(object):
         print(None)
         return (self.majority_label, context[0])
 
-    def predict_unk(self, context):
-        """
-        Predict without any ground truth
-        """
-        if type(context) != list:
-            context = self.clean_text(context)
-
-        for rule in self.decision_list:
-            if self.check_rule(context, rule[0]):
-                # + implies root, - implies root_star
-                if rule[1] > 0:
-                    return self.root
-                elif rule[1] < 0:
-                    return self.root_star
-
-        # Default to majority label
-        return (self.majority_label, context[0] == self.majority_label)
-
     def check_rule(self, context, rule):
         """
         Given a rule and a context
@@ -459,22 +441,6 @@ class DecisionListClf(object):
         pp.pprint(pos_corpus)
         return pos_corpus
 
-    def clean_text(self, text):
-        """
-        Process raw text without sense information
-        """
-        # remove XML tags from corpus
-        text = re.sub(r'\<.*?(\>|$)', '', text)
-        # Punkt tokenize the context
-        text = tokenizer.tokenize(text)
-        # Get rid of stop words and punctuation from the context
-        stop_words = stopwords.words("english")
-        stop_words.extend(string.punctuation)
-        # only keep context words that aren't in our stop words list
-        text = [w.lower() for w in text if w not in stop_words]
-        #pp.pprint(text)
-        return text
-
     def test_based_on_paper_results(self):
         # Should equal ~7.14 according to Yarowsky given test data string
         print(self.calculate_log_likelihood("pword_sea"))
@@ -493,7 +459,6 @@ def main(args):
     else:
         clf = DecisionListClf(test_data)
         clf.test_based_on_paper_results()
-        print(clf.predict_unk("restaurant, waiters serve pecan-crusted sea bass ($18.95) and peppered rib eye"))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
