@@ -1,6 +1,5 @@
 """
 Word Sense Disambiguation through WordNet Lookup and a Simplified Lesk
-resolution step.
 """
 
 import sys
@@ -97,6 +96,7 @@ def simple_lesk(results, context):
 
     context = set(w.lower() for w in tokenizer.tokenize(context) \
                     if w.lower() not in stop_words)
+    context = set(base_form_of(w) for w in context if base_form_of(w))
 
     for sense in results["synsets"]:
         signature = set()
@@ -105,6 +105,7 @@ def simple_lesk(results, context):
 
         signature = set(w.lower() for w in tokenizer.tokenize(" ".join(text)) \
                             if w.lower() not in stop_words)
+        signature = set(base_form_of(w) for w in signature if base_form_of(w))
         overlap = compute_overlap(signature, context)
 
         print "Wordnet:", " ".join(signature)

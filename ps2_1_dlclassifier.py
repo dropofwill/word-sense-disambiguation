@@ -1,46 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Supervised Decision List Classifier for Word Sense Disambiguation.
-
-TODO:
-    ---
-    Procedure:
-    √ Read Supervised Paper
-    √ Review Class Notes
-    √ Preprocess the data, tokenize, remove punctuation, & remove xml bits
-    √ POS tag Select features, +/- k word, +/- k POS, k = {1,2} words within +/- 5
-    √ For each feature calculate the log likelihood based on the training corpus
-    √ Smooth the counts, with Laplace/Lidstone for instance
-    √ Rank the rules in a decision list based on probabilities
-    √ Classify test data with the most predictive rule that matches
-    ---
-    Report:
-    1-2 paragraph summary of the paper: assumptions, other use cases?
-    Conceptually explain the process
-    √ Report the top-10 rules per case
-    √ Report on the performance:
-        √ For each case what was the test set baseline:
-            √ Prior Probability of the majority class
-            √ Actual Majority class label
-        √ Comparison to baseline, actual accuracy and % error reduction over baseline
-        √ Compute precision and recall by sense on each test set
-        √ Compute macro average by weighing each class equally
-        √ Include confusion matrices for both cases with observations
-        √ Include 3 examples of correct and incorrect classification for each case
-    Based on these results provide a discussion/reflection.
-        e.g. What influenced the results of the performance metrics?
-        What does the confusion matrices tell you?
-        What went wrong on the examples?
-        What concerns if any did you encounter along the way?
-    ---
-    Bonus (Up to 20):
-    +5 Implement method to prune the decision list or interpolate between rules lower in the list
-    +7 Read paper and contrast the method with Yarowsky's method
-    +3 Apply another smoothing algorithm such as Witten-Bell or Good Turing. Discuss results.
-    +5 Yarowsky is known for the unsupervised version of the decision list. Read the paper and analyze how it differs from the supervised method.
-    +7.5 Update code to account for the unsupervised approach
-    ---
-    Problem 6: 1-2 Creative visualization of the WSD problem. Demonstrate ideas visually.
 """
 
 import sys
@@ -110,6 +70,11 @@ class DecisionListClf(object):
         # It handles basic normalization by removing English stop words,
         # punctuation, and XML tags
         self.train = self.process_corpus(train_data)
+
+        #portion = int(len(self.train) * 0.5)
+        #self.train = self.train[:portion]
+        #print(portion)
+        #print(len(self.train))
 
         if test_data:
             self.test = self.process_corpus(test_data)
