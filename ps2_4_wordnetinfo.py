@@ -35,6 +35,8 @@ def check_hyper_hypo(synset1, synset2):
         s2_hypers |= set(s2.hypernyms())
         s2_hypos |= set(s2.hyponyms())
 
+    #print(s1_hypers, s1_hypos, s2_hypers, s1_hypos)
+
     s1_hypos_of_s2   = s1_hypos & set(synset2)
     s1_hypers_of_s2  = s1_hypers & set(synset2)
     s2_hypos_of_s1   = s2_hypos & set(synset1)
@@ -43,16 +45,16 @@ def check_hyper_hypo(synset1, synset2):
     print("")
     if len(s1_hypos_of_s2):
         for syn in s1_hypos_of_s2:
-            print(s1_name + " is a hyponym of " + syn.name)
+            print(s1_name + " is a hypernym of " + syn.name)
     if len(s1_hypers_of_s2):
         for syn in s1_hypers_of_s2:
-            print(s1_name + " is a hypernym of " + syn.name)
+            print(s1_name + " is a hyponym of " + syn.name)
     if len(s2_hypos_of_s1):
         for syn in s2_hypos_of_s1:
-            print(s2_name + " is a hyponym of " + syn.name)
+            print(s2_name + " is a hypernym of " + syn.name)
     if len(s2_hypers_of_s1):
         for syn in s2_hypers_of_s1:
-            print(s2_name + " is a hypernym of " + syn.name)
+            print(s2_name + " is a hyponym of " + syn.name)
 
 def wu_p_sim(result1, result2):
     """
@@ -103,11 +105,12 @@ def simple_lesk(results, context):
 
         signature = set(w.lower() for w in tokenizer.tokenize(" ".join(text)) \
                             if w.lower() not in stop_words)
+        overlap = compute_overlap(signature, context)
+
         print "Wordnet:", " ".join(signature)
         print "User:", " ".join(context)
 
-        overlap = compute_overlap(signature, context)
-        print overlap
+        print "Overlap:", overlap
         print("")
 
         if overlap > max_overlap:
@@ -150,7 +153,7 @@ def main(args):
     contexts.append(args.context2 if args.context2 else raw_input("Enter a context for " + words[1] + " >> "))
 
     results = get_results(words, contexts)
-
+    print("----------")
     print_results(results[0])
     print("")
     print_results(results[1])
