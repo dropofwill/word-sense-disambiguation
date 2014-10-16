@@ -1,10 +1,6 @@
 """
 Word Sense Disambiguation through WordNet Lookup and a Simplified Lesk
 resolution step.
-
-TODO:
-    Testing
-    Are the two terms Hypo/Hypernyms
 """
 
 import sys
@@ -28,29 +24,35 @@ def pos_of(synset):
 
 def check_hyper_hypo(synset1, synset2):
     s1_hypos, s1_hypers, s2_hypos, s2_hypers = set(), set(), set(), set()
-    for s1 in synset1:
-        s1_hypers.add(s1.hypernyms())
-        s1_hypos.add(s1.hyponyms())
-        #s1_hypers = s1.hypernyms()
-        #s1_hypos = s1.hyponyms()
-        print("Hypo: ", s1_hypos)
-        print("Hyper:", s1_hypers)
+    s1_name, _, __ = str(synset1[0].name).split(".")
+    s2_name, _, __ = str(synset2[0].name).split(".")
 
-    print("\n")
+    for s1 in synset1:
+        s1_hypers |= set(s1.hypernyms())
+        s1_hypos |= set(s1.hyponyms())
 
     for s2 in synset2:
-        s2_hypers.add(s2.hypernyms())
-        s2_hypos.add(s2.hyponyms())
-        #s2_hypers = s2.hypernyms()
-        #s2_hypos = s2.hyponyms()
-        print("Hypo: ", s2_hypos)
-        print("Hyper:", s2_hypers)
+        s2_hypers |= set(s2.hypernyms())
+        s2_hypos |= set(s2.hyponyms())
 
-    #print(s2_hypos[0] == s2_hypos[0])
-    print("\n")
-    print(s1_hypers, set(synset2))
-    print(s1_hypers & set(synset2))
-    #print(s1_hypos & s2_hypos)
+    s1_hypos_of_s2   = s1_hypos & set(synset2)
+    s1_hypers_of_s2  = s1_hypers & set(synset2)
+    s2_hypos_of_s1   = s2_hypos & set(synset1)
+    s2_hypers_of_s1  = s2_hypers & set(synset1)
+
+    print("")
+    if len(s1_hypos_of_s2):
+        for syn in s1_hypos_of_s2:
+            print(s1_name + " is a hyponym of " + syn.name)
+    if len(s1_hypers_of_s2):
+        for syn in s1_hypers_of_s2:
+            print(s1_name + " is a hypernym of " + syn.name)
+    if len(s2_hypos_of_s1):
+        for syn in s2_hypos_of_s1:
+            print(s2_name + " is a hyponym of " + syn.name)
+    if len(s2_hypers_of_s1):
+        for syn in s2_hypers_of_s1:
+            print(s2_name + " is a hypernym of " + syn.name)
 
 def wu_p_sim(result1, result2):
     """
@@ -141,12 +143,9 @@ def get_results(word_list, word_context):
     return list_results
 
 def main(args):
-    #print args
     words, contexts = [], []
-
     words.append(args.word1 if args.word1 else raw_input("Enter a word to compare >> "))
     words.append(args.word2 if args.word2 else raw_input("Enter a word to compare >> "))
-
     contexts.append(args.context1 if args.context1 else raw_input("Enter a context for " + words[0] + " >> "))
     contexts.append(args.context2 if args.context2 else raw_input("Enter a context for " + words[1] + " >> "))
 
@@ -158,6 +157,7 @@ def main(args):
 
     check_hyper_hypo(results[0]["synsets"], results[1]["synsets"])
 
+    print("")
     print("{:<20}{:>}"
             .format("Leacock-Chodorow Similarity: ",
                l_ch_sim(results[0], results[1])))
