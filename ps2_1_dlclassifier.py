@@ -222,7 +222,7 @@ class DecisionListClf(object):
                                             self.res["root_star_recall"], \
                                             self.res["root_recall"])
         # bin log-likelihood by casting as an int
-        self.res["dlist_dist"] = [int(r[1]) for r in self.decision_list]
+        self.res["dlist_dist"] = [math.fabs(int(r[1])) for r in self.decision_list]
         #pp.pprint(self.res["dlist_dist"])
 
     def print_results(self):
@@ -271,24 +271,20 @@ class DecisionListClf(object):
                 .format("Macro Precision: ", self.res["macro_precision"]))
         print("{:<30}{:>.3%}"
                 .format("Macro Recall: ", self.res["macro_recall"]))
-
         print("")
         print("Top Ten Rules:")
         for l in self.decision_list[:10]:
             print("{:<30}{:>.4}".format(l[0], l[1]))
-
         print("")
         print("3 Correct:")
         for l in self.res["correct"][:3]:
             print("Correctly Predicted: {} \n Rule: {}, log-likelihood: {} \n {}"
                     .format(l[0], l[2][0], l[2][1], " ".join(l[3])))
-
         print("")
         print("3 Incorrect:")
         for l in self.res["incorrect"][:3]:
             print("Predicted: {}, was actually: {} \n Rule: {}, log-likelihood: {} \n {}"
                     .format(l[0], l[1], l[2][0], l[2][1], " ".join(l[3])))
-
 
     def confustion_matrix(self, predictions, references):
         return ConfusionMatrix(references, predictions)
@@ -400,15 +396,6 @@ class DecisionListClf(object):
             if k_word:
                 # create freqdist for each sense per word
                 condition = str(k) + "_word_" + re.sub(r'\_', '', k_word)
-                self.cfd[condition][sense] += 1
-
-    def next_word_dist(self, corpus):
-        for line in corpus:
-            sense, context = line[0], line[1]
-            next_word = self.get_k_word(1, context)
-            if next_word:
-                # create freqdist for each sense per word
-                condition = "1_word_" + re.sub(r'\_', '', next_word)
                 self.cfd[condition][sense] += 1
 
     def k_tag_dist(self, corpus, k):
