@@ -50,6 +50,7 @@ import string
 import re
 import math
 import nltk
+from nltk.probability import FreqDist
 from nltk.probability import ConditionalFreqDist
 from nltk.probability import ConditionalProbDist
 from nltk.probability import LaplaceProbDist
@@ -220,8 +221,15 @@ class DecisionListClf(object):
                                             self.res["root_precision"], \
                                             self.res["root_star_recall"], \
                                             self.res["root_recall"])
+        # bin log-likelihood by casting as an int
+        self.res["dlist_dist"] = [int(r[1]) for r in self.decision_list]
+        #pp.pprint(self.res["dlist_dist"])
 
     def print_results(self):
+        print("")
+        print("int-binned log-likelihood distributions:")
+        ll_fdist = FreqDist(self.res["dlist_dist"])
+        ll_fdist.tabulate()
         print("")
         print(self.res["cm"])
 

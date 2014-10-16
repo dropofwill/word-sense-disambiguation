@@ -26,6 +26,32 @@ def synsets_of(word):
 def pos_of(synset):
     return set(sense.pos for sense in synset)
 
+def check_hyper_hypo(synset1, synset2):
+    s1_hypos, s1_hypers, s2_hypos, s2_hypers = set(), set(), set(), set()
+    for s1 in synset1:
+        s1_hypers.add(s1.hypernyms())
+        s1_hypos.add(s1.hyponyms())
+        #s1_hypers = s1.hypernyms()
+        #s1_hypos = s1.hyponyms()
+        print("Hypo: ", s1_hypos)
+        print("Hyper:", s1_hypers)
+
+    print("\n")
+
+    for s2 in synset2:
+        s2_hypers.add(s2.hypernyms())
+        s2_hypos.add(s2.hyponyms())
+        #s2_hypers = s2.hypernyms()
+        #s2_hypos = s2.hyponyms()
+        print("Hypo: ", s2_hypos)
+        print("Hyper:", s2_hypers)
+
+    #print(s2_hypos[0] == s2_hypos[0])
+    print("\n")
+    print(s1_hypers, set(synset2))
+    print(s1_hypers & set(synset2))
+    #print(s1_hypos & s2_hypos)
+
 def wu_p_sim(result1, result2):
     """
     Input: Two results dicts
@@ -67,7 +93,6 @@ def simple_lesk(results, context):
 
     context = set(w.lower() for w in tokenizer.tokenize(context) \
                     if w.lower() not in stop_words)
-    print context
 
     for sense in results["synsets"]:
         signature = set()
@@ -76,34 +101,30 @@ def simple_lesk(results, context):
 
         signature = set(w.lower() for w in tokenizer.tokenize(" ".join(text)) \
                             if w.lower() not in stop_words)
-
-        print signature
+        print "Wordnet:", " ".join(signature)
+        print "User:", " ".join(context)
 
         overlap = compute_overlap(signature, context)
         print overlap
+        print("")
 
         if overlap > max_overlap:
             max_overlap = overlap
             best_sense = sense
-
     return best_sense
 
 def print_results(results):
     print("{:<20}{:>}"
             .format("Word:", results["word"]))
-
     print("{:<20}{:>}"
             .format("Base Form:", results["base"]))
-
     # hacky way to print an awkward list neatly
     print("{:<20}{:>}"
             .format("Synsets:", results["synsets"][0]))
     for syn in results["synsets"][1:]:
         print("{:<20}{:>}".format("", syn))
-
     print("{:<20}{:>}"
             .format("Possible POS tags:", ", ".join(results["pos_tags"])))
-
     print("{:<20}{:>}"
             .format("Best sense via Lesk: ", results["best_sense"]))
 
@@ -116,14 +137,11 @@ def get_results(word_list, word_context):
         res["synsets"] = synsets_of(res["base"])
         res["pos_tags"] = pos_of(res["synsets"])
         res["best_sense"] = simple_lesk(res, word_context[i])
-        print_results(res)
         list_results.append(res)
-    print("\n")
-
     return list_results
 
 def main(args):
-    print args
+    #print args
     words, contexts = [], []
 
     words.append(args.word1 if args.word1 else raw_input("Enter a word to compare >> "))
@@ -134,10 +152,15 @@ def main(args):
 
     results = get_results(words, contexts)
 
+    print_results(results[0])
+    print("")
+    print_results(results[1])
+
+    check_hyper_hypo(results[0]["synsets"], results[1]["synsets"])
+
     print("{:<20}{:>}"
             .format("Leacock-Chodorow Similarity: ",
                l_ch_sim(results[0], results[1])))
-
     print("{:<20}{:>}"
             .format("Wu-Palmer Similarity: ",
                wu_p_sim(results[0], results[1])))
