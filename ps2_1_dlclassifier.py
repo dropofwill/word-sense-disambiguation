@@ -166,6 +166,9 @@ class DecisionListClf(object):
             elif pred != ref:
                 self.res["incorrect"].append([pred, ref, r, c])
 
+        #pp.pprint(self.res["correct"])
+        #pp.pprint(self.res["incorrect"])
+
         self.res["predictions"] = predictions
         self.res["references"] = references
         self.res["cm"] = self.confustion_matrix(predictions, references)
