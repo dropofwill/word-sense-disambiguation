@@ -156,16 +156,19 @@ class DecisionListClf(object):
             self.res["prior_probability"] = self.res["root_prior"]
 
         predictions, references = [], []
-        self.res["correct"], self.res["incorrect"] = [], []
+        self.res["correct"], self.res["incorrect"], self.res["all_res"] = [], [], []
         for context in self.test:
             pred, ref, r, c = self.predict(context)
             predictions.append(pred)
             references.append(ref)
             if pred == ref:
                 self.res["correct"].append([pred, ref, r, c])
+                self.res["all_res"].append([r[1], "correct"])
             elif pred != ref:
                 self.res["incorrect"].append([pred, ref, r, c])
+                self.res["all_res"].append([r[1], "incorrect"])
 
+        pp.pprint(self.res["all_res"])
         #pp.pprint(self.res["correct"])
         #pp.pprint(self.res["incorrect"])
 
@@ -190,8 +193,16 @@ class DecisionListClf(object):
                                             self.res["root_star_recall"], \
                                             self.res["root_recall"])
         # bin log-likelihood by casting as an int
-        self.res["dlist_dist"] = [math.fabs(int(r[1])) for r in self.decision_list]
+        self.res["dlist_dist"] = [int(r[1]) for r in self.decision_list]
+        #self.res["dlist_dist"] = [math.fabs(int(r[1])) for r in self.decision_list]
         #pp.pprint(self.res["dlist_dist"])
+
+        self.res["cnd_dist"] = ConditionalFreqDist()
+        for res in self.res["all_res"]:
+            #condition = str(res[0]) + "_" + str(res[1])
+            self.res["cnd_dist"][str(math.fabs(int(res[0])))][str(res[1])] += 1
+
+        self.res["cnd_dist"].tabulate()
 
     def print_results(self):
         print("")
