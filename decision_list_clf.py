@@ -205,11 +205,11 @@ class DecisionListClf(object):
         self.res["cnd_dist"].tabulate()
 
     def print_results(self):
-        print("")
+        print
         print("int-binned log-likelihood distributions:")
         ll_fdist = FreqDist(self.res["dlist_dist"])
         ll_fdist.tabulate()
-        print("")
+        print
         print(self.res["cm"])
 
         print("{:<30}{:>.3%}"
@@ -218,7 +218,7 @@ class DecisionListClf(object):
         print("{:<30}{:>}"
                 .format("Majority Class Label: ", self.majority_label))
 
-        print("")
+        print
         print("{:<30}{:>.3%}"
                 .format("Accuracy: ", self.res["accuracy"]))
         print("{:<30}{:>.3%}"
@@ -227,7 +227,7 @@ class DecisionListClf(object):
                 .format("Error Reduction / Baseline: ",
                     self.res["error_reduction"]))
 
-        print("")
+        print
         print("{:<7}{:<23}{:>.3%}"
                 .format(self.root_star,
                     "Precision: ",
@@ -245,21 +245,21 @@ class DecisionListClf(object):
                     "Recall: ",
                     self.res["root_recall"]))
 
-        print("")
+        print
         print("{:<30}{:>.3%}"
                 .format("Macro Precision: ", self.res["macro_precision"]))
         print("{:<30}{:>.3%}"
                 .format("Macro Recall: ", self.res["macro_recall"]))
-        print("")
+        print
         print("Top Ten Rules:")
         for l in self.decision_list[:10]:
             print("{:<30}{:>.4}".format(l[0], l[1]))
-        print("")
+        print
         print("3 Correct:")
         for l in self.res["correct"][:3]:
             print("Correctly Predicted: {} \n Rule: {}, log-likelihood: {} \n {}"
                     .format(l[0], l[2][0], l[2][1], " ".join(l[3])))
-        print("")
+        print
         print("3 Incorrect:")
         for l in self.res["incorrect"][:3]:
             print("Predicted: {}, was actually: {} \n Rule: {}, log-likelihood: {} \n {}"
