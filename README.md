@@ -1,4 +1,4 @@
-# Word Sense Disambiguation
+Word Sense Disambiguation
 ======
 
 Word Sense Disambiguation with:
